@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l C:Usersz00305jbcodesoli*.js C:Usersz00305jbcodesoli*.css C:Usersz00305jbcodesoli*.html)"
+    ]
+  }
+}
