@@ -1,36 +1,47 @@
-// Vykreslování UI — řídí DOM na základě stavu kvízu
-
 import { GROUPS } from './data.js';
 
 const POSITIVE_MESSAGES = [
-  'Výborně! 🎉',
-  'Správně! Jsi na tom skvěle.',
-  'Přesně tak! Pokračuj.',
-  'Perfektní! Máš to.',
-  'Super! Učení jde jako po másle.',
-  'Správně! Chytrý chemik.',
-  'Ano! Přesná odpověď.',
+  'Správně!',
+  'Výborně!',
+  'Přesně tak!',
+  'Perfektní!',
+  'Super!',
+  'Ano, přesně!',
+  'Skvělá práce!',
+  'Correct!',
 ];
 
-function randomPositive() {
-  return POSITIVE_MESSAGES[Math.floor(Math.random() * POSITIVE_MESSAGES.length)];
+const STREAK_5_MESSAGES = [
+  '🔥 5 v řadě! Jsi na vlně, pokračuj!',
+  '⭐ Pět správně za sebou! Výborný výkon!',
+  '🚀 Série 5! Chemické názvosloví ti jde skvěle!',
+];
+
+const STREAK_10_MESSAGES = [
+  '🏆 NEUVĚŘITELNÉ! 10 správně v řadě! Jsi mistr chemického názvosloví!',
+  '🎉 FANTASTICKÉ! 10 v řadě! Tohle je na jedničku s hvězdičkou!',
+  '🌟 10 ZA SEBOU! Gratuluji — to je špičkový výkon!',
+];
+
+function randomFrom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
 function escapeHtml(text) {
-  return text
+  return String(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
 
-// Převede chemický vzorec na HTML s horními/dolními indexy
 function formatFormula(formula) {
-  // Subscript čísla: za písmenem nebo závorkou
   return escapeHtml(formula)
     .replace(/(\d+)/g, '<sub>$1</sub>')
     .replace(/·/g, ' · ');
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export class UI {
   constructor(quiz, onAnswer, onNext, onModeChange, onGroupToggle, onReset) {
@@ -40,33 +51,30 @@ export class UI {
     this.onModeChange = onModeChange;
     this.onGroupToggle = onGroupToggle;
     this.onReset = onReset;
+    this._currentChoices = [];
 
     this._buildShell();
     this._attachStaticListeners();
   }
 
-  // ─── Sestavení základního HTML ─────────────────────────────────────────────
+  // ─── Shell ────────────────────────────────────────────────────────────────
 
   _buildShell() {
     document.body.innerHTML = '';
-
     const wrapper = document.createElement('div');
     wrapper.className = 'app-wrapper';
     wrapper.innerHTML = `
       <header class="app-header">
-        <div>
-          <div class="app-title">Soli <span>— chemické názvosloví</span></div>
+        <div class="app-title">Soli <span>— chemické názvosloví</span></div>
+        <div class="header-right">
+          <button class="errors-btn" id="errorsBtn" title="Zobrazit záznamy chyb">Chyby <span class="errors-count" id="errorsCount">0</span></button>
+          <div class="stats-bar" id="statsBar"></div>
         </div>
-        <div class="stats-bar" id="statsBar"></div>
       </header>
 
       <div class="mode-switcher">
-        <button class="mode-btn active" data-mode="A">
-          Vzorec → Název
-        </button>
-        <button class="mode-btn" data-mode="B">
-          Název → Vzorec
-        </button>
+        <button class="mode-btn active" data-mode="A">Vzorec → Název</button>
+        <button class="mode-btn" data-mode="B">Název → Vzorec</button>
       </div>
 
       <section class="groups-section">
@@ -75,17 +83,27 @@ export class UI {
       </section>
 
       <main class="question-card" id="questionCard">
-        <div class="empty-state">
-          <h2>Připrav se!</h2>
-          <p>Klikni na „Další úloha" a začni procvičovat.</p>
-        </div>
+        <div class="empty-state"><h2>Připrav se!</h2><p>Klikni na „Další úloha".</p></div>
       </main>
 
-      <button class="next-btn" id="nextBtn">
-        Další úloha →
-      </button>
-    `;
+      <button class="next-btn" id="nextBtn">Další úloha →</button>
 
+      <!-- Panel chyb -->
+      <div class="errors-overlay hidden" id="errorsOverlay">
+        <div class="errors-panel">
+          <div class="errors-panel-header">
+            <h2>Záznamy chyb</h2>
+            <button class="close-btn" id="closeErrorsBtn">✕</button>
+          </div>
+          <div class="errors-list" id="errorsList"></div>
+        </div>
+      </div>
+
+      <!-- Oslava streaku -->
+      <div class="celebration-overlay hidden" id="celebrationOverlay">
+        <div class="celebration-box" id="celebrationBox"></div>
+      </div>
+    `;
     document.body.appendChild(wrapper);
 
     this.els = {
@@ -94,20 +112,112 @@ export class UI {
       questionCard: wrapper.querySelector('#questionCard'),
       nextBtn: wrapper.querySelector('#nextBtn'),
       modeBtns: wrapper.querySelectorAll('.mode-btn'),
+      errorsBtn: wrapper.querySelector('#errorsBtn'),
+      errorsCount: wrapper.querySelector('#errorsCount'),
+      errorsOverlay: wrapper.querySelector('#errorsOverlay'),
+      errorsList: wrapper.querySelector('#errorsList'),
+      closeErrorsBtn: wrapper.querySelector('#closeErrorsBtn'),
+      celebrationOverlay: wrapper.querySelector('#celebrationOverlay'),
+      celebrationBox: wrapper.querySelector('#celebrationBox'),
     };
   }
 
   _attachStaticListeners() {
-    // Přepínač režimu
     this.els.modeBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const mode = btn.dataset.mode;
-        this.onModeChange(mode);
-      });
+      btn.addEventListener('click', () => this.onModeChange(btn.dataset.mode));
     });
-
-    // Tlačítko Další
     this.els.nextBtn.addEventListener('click', () => this.onNext());
+    this.els.errorsBtn.addEventListener('click', () => this._showErrorsPanel());
+    this.els.closeErrorsBtn.addEventListener('click', () => this._hideErrorsPanel());
+    this.els.errorsOverlay.addEventListener('click', e => {
+      if (e.target === this.els.errorsOverlay) this._hideErrorsPanel();
+    });
+    this.els.celebrationOverlay.addEventListener('click', () => this._hideCelebration());
+  }
+
+  // ─── Panel chyb ───────────────────────────────────────────────────────────
+
+  _showErrorsPanel() {
+    const log = this.quiz.errorLog;
+    if (log.length === 0) {
+      this.els.errorsList.innerHTML = '<p class="errors-empty">Zatím žádné chyby — skvělá práce! 🎉</p>';
+    } else {
+      // Seskupit podle id příkladu, zobrazit unikátní (nejnovější chybu)
+      const seen = new Map();
+      [...log].reverse().forEach(entry => {
+        if (!seen.has(entry.example.id)) seen.set(entry.example.id, entry);
+      });
+
+      this.els.errorsList.innerHTML = [...seen.values()].map(entry => {
+        const isFormula = entry.mode === 'B';
+        const questionLabel = entry.mode === 'A' ? 'Vzorec' : 'Název';
+        const questionValue = entry.mode === 'A' ? entry.example.formula : entry.example.name;
+        const correctLabel = entry.mode === 'A' ? 'Správný název' : 'Správný vzorec';
+
+        return `
+          <div class="error-entry">
+            <div class="error-meta">
+              <span class="error-group">${escapeHtml(entry.example.group)}</span>
+              <span class="error-time">${entry.timestamp.toLocaleTimeString('cs-CZ', {hour:'2-digit', minute:'2-digit'})}</span>
+            </div>
+            <div class="error-question"><span class="error-label">${questionLabel}:</span> <strong>${isFormula ? entry.example.name : formatFormula(questionValue)}</strong></div>
+            <div class="error-your"><span class="error-label">Tvá odpověď:</span> <span class="wrong-answer">${escapeHtml(entry.userInput)}</span></div>
+            <div class="error-correct"><span class="error-label">${correctLabel}:</span> <strong>${isFormula ? formatFormula(entry.correctAnswer) : escapeHtml(entry.correctAnswer)}</strong></div>
+            <div class="error-explanation">${escapeHtml(entry.example.explanation)}</div>
+          </div>
+        `;
+      }).join('');
+    }
+    this.els.errorsOverlay.classList.remove('hidden');
+  }
+
+  _hideErrorsPanel() {
+    this.els.errorsOverlay.classList.add('hidden');
+  }
+
+  // ─── Oslava ───────────────────────────────────────────────────────────────
+
+  showCelebration(streak) {
+    const msg = streak >= 10
+      ? randomFrom(STREAK_10_MESSAGES)
+      : randomFrom(STREAK_5_MESSAGES);
+
+    const isEpic = streak >= 10;
+    this.els.celebrationBox.innerHTML = `
+      <div class="celebration-inner ${isEpic ? 'epic' : ''}">
+        <div class="celebration-msg">${escapeHtml(msg)}</div>
+        <div class="celebration-streak">${streak} v řadě!</div>
+        <button class="celebration-close">Díky, pokračuji! →</button>
+      </div>
+    `;
+    this.els.celebrationOverlay.classList.remove('hidden');
+    this.els.celebrationBox.querySelector('.celebration-close')
+      .addEventListener('click', () => this._hideCelebration());
+
+    if (isEpic) this._launchConfetti();
+  }
+
+  _hideCelebration() {
+    this.els.celebrationOverlay.classList.add('hidden');
+  }
+
+  _launchConfetti() {
+    const colors = ['#2563eb','#16a34a','#d97706','#dc2626','#7c3aed','#db2777'];
+    const overlay = this.els.celebrationOverlay;
+    for (let i = 0; i < 60; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'confetti-dot';
+      dot.style.cssText = `
+        left:${Math.random()*100}%;
+        background:${colors[Math.floor(Math.random()*colors.length)]};
+        animation-delay:${Math.random()*1}s;
+        animation-duration:${1.5 + Math.random()}s;
+        width:${6 + Math.random()*8}px;
+        height:${6 + Math.random()*8}px;
+      `;
+      overlay.appendChild(dot);
+      dot.addEventListener('animationend', () => dot.remove());
+    }
   }
 
   // ─── Skupiny ──────────────────────────────────────────────────────────────
@@ -120,7 +230,6 @@ export class UI {
       [GROUPS.PODVOJNE]: 'Podvojné',
       [GROUPS.ZASADITE]: 'Zásadité',
     };
-
     this.els.groupsList.innerHTML = '';
     Object.values(GROUPS).forEach(group => {
       const chip = document.createElement('button');
@@ -136,14 +245,18 @@ export class UI {
   renderStats() {
     const s = this.quiz.getStats();
     this.els.statsBar.innerHTML = `
-      <span class="stat-chip correct">✓ ${s.correct}</span>
-      <span class="stat-chip wrong">✗ ${s.wrong}</span>
-      <span class="stat-chip total">${s.accuracy}%</span>
-      <button class="reset-btn" id="resetBtn" title="Resetovat session">↺ Reset</button>
+      <span class="stat-chip correct" title="Správně">✓ ${s.correct}</span>
+      <span class="stat-chip wrong" title="Špatně">✗ ${s.wrong}</span>
+      <span class="stat-chip total" title="Úspěšnost">${s.accuracy}%</span>
+      ${s.streak >= 2 ? `<span class="stat-chip streak" title="Série správných odpovědí">🔥 ${s.streak}</span>` : ''}
+      <button class="reset-btn" id="resetBtn" title="Resetovat session">↺</button>
     `;
     this.els.statsBar.querySelector('#resetBtn').addEventListener('click', () => {
-      if (confirm('Opravdu chceš resetovat statistiky?')) this.onReset();
+      if (confirm('Opravdu chceš resetovat statistiky a chyby?')) this.onReset();
     });
+    // Počet chyb na tlačítku
+    this.els.errorsCount.textContent = s.errorCount;
+    this.els.errorsBtn.classList.toggle('has-errors', s.errorCount > 0);
   }
 
   // ─── Přepínač režimu ─────────────────────────────────────────────────────
@@ -156,166 +269,131 @@ export class UI {
 
   // ─── Otázka ───────────────────────────────────────────────────────────────
 
-  renderQuestion(example) {
+  renderQuestion(example, isRetry = false) {
     const isMultipleChoice = this.quiz.isMultipleChoicePhase();
-    const isFormulaQuestion = this.quiz.mode === 'A'; // A: vzorec → název
+    const isModeA = this.quiz.mode === 'A';
 
-    const promptLabel = isFormulaQuestion ? 'Vzorec' : 'Název';
-    const promptValue = isFormulaQuestion ? example.formula : example.name;
-    const answerLabel = isFormulaQuestion ? 'Napiš název soli:' : 'Napiš vzorec soli:';
+    const promptLabel = isModeA ? 'Vzorec' : 'Název';
+    const promptValue = isModeA ? example.formula : example.name;
+    const answerLabel = isModeA ? 'Napiš název soli:' : 'Napiš vzorec soli:';
 
-    const phaseHtml = isMultipleChoice
+    const retryBadge = isRetry
+      ? `<span class="retry-badge">🔁 Opakování</span>`
+      : '';
+    const phaseBadge = isMultipleChoice
       ? `<span class="phase-badge">výběr z možností</span>`
       : '';
 
     let answerHtml;
-
     if (isMultipleChoice) {
       const { choices } = this.quiz.generateChoices(example);
-      // Uložit choices na instanci pro přístup z listeneru
       this._currentChoices = choices;
-      const choiceItems = choices.map((c, i) =>
+      const items = choices.map((c, i) =>
         `<button class="choice-btn" data-index="${i}">${escapeHtml(c)}</button>`
       ).join('');
       answerHtml = `
         <div class="answer-label">${escapeHtml(answerLabel)}</div>
-        <div class="choices-list" id="choicesList">${choiceItems}</div>
+        <div class="choices-list" id="choicesList">${items}</div>
       `;
     } else {
       answerHtml = `
         <div class="answer-label">${escapeHtml(answerLabel)}</div>
         <div class="answer-input-wrap">
-          <input
-            class="answer-input"
-            id="answerInput"
-            type="text"
+          <input class="answer-input" id="answerInput" type="text"
             placeholder="Tvoje odpověď..."
-            autocomplete="off"
-            autocorrect="off"
-            spellcheck="false"
-          />
+            autocomplete="off" autocorrect="off" spellcheck="false" />
           <button class="submit-btn" id="submitBtn">Zkontrolovat</button>
         </div>
       `;
     }
 
-    const formulaClass = isFormulaQuestion ? ' formula' : '';
-    const displayValue = isFormulaQuestion
-      ? `<span class="question-value${formulaClass}">${formatFormula(promptValue)}</span>`
+    const displayValue = isModeA
+      ? `<span class="question-value formula">${formatFormula(promptValue)}</span>`
       : `<span class="question-value">${escapeHtml(promptValue)}</span>`;
 
-    // Progres bar (příblíně, 10 = 100 %)
-    const progress = Math.min(this.quiz.sessionAnswered / 20, 1) * 100;
+    const progress = Math.min(this.quiz.sessionAnswered / 30, 1) * 100;
+    const stars = '★'.repeat(example.difficulty) + '☆'.repeat(3 - example.difficulty);
 
     this.els.questionCard.innerHTML = `
       <div class="question-meta">
         <span class="question-group-badge">${escapeHtml(example.group)}</span>
-        <div style="display:flex;gap:6px;align-items:center">
-          ${phaseHtml}
-          <span class="question-mode-label">Obtížnost ${'★'.repeat(example.difficulty)}${'☆'.repeat(3 - example.difficulty)}</span>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          ${retryBadge}${phaseBadge}
+          <span class="question-mode-label">${stars}</span>
         </div>
       </div>
-
       <div class="progress-wrap">
         <div class="progress-fill" style="width:${progress}%"></div>
       </div>
-
       <div>
         <div class="question-prompt-label">${escapeHtml(promptLabel)}:</div>
         ${displayValue}
       </div>
-
       <div class="answer-section" id="answerSection">
         ${answerHtml}
       </div>
-
       <div id="resultSection"></div>
     `;
 
-    // Připojit listenery
     this._attachAnswerListeners(example, isMultipleChoice);
-
-    // Skrýt tlačítko Další (ukáže se po odpovědi)
     this.els.nextBtn.style.display = 'none';
   }
 
   _attachAnswerListeners(example, isMultipleChoice) {
     if (isMultipleChoice) {
-      const choicesList = this.els.questionCard.querySelector('#choicesList');
-      if (!choicesList) return;
-      const choices = this._currentChoices || [];
-      choicesList.querySelectorAll('.choice-btn').forEach(btn => {
+      const list = this.els.questionCard.querySelector('#choicesList');
+      if (!list) return;
+      const choices = this._currentChoices;
+      list.querySelectorAll('.choice-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const idx = parseInt(btn.dataset.index, 10);
-          const userInput = choices[idx] ?? btn.textContent.trim();
-          this._handleAnswerSubmit(userInput, example);
+          this._submit(choices[idx] ?? btn.textContent.trim(), example, true);
         });
       });
     } else {
       const input = this.els.questionCard.querySelector('#answerInput');
       const submitBtn = this.els.questionCard.querySelector('#submitBtn');
       if (!input || !submitBtn) return;
-
-      // Odeslat Enterem
       input.addEventListener('keydown', e => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !submitBtn.disabled) {
           e.preventDefault();
-          if (!submitBtn.disabled) this._handleAnswerSubmit(input.value, example);
+          this._submit(input.value, example, false);
         }
       });
-
-      submitBtn.addEventListener('click', () => {
-        this._handleAnswerSubmit(input.value, example);
-      });
-
-      // Fokus na input
+      submitBtn.addEventListener('click', () => this._submit(input.value, example, false));
       setTimeout(() => input.focus(), 50);
     }
   }
 
-  _handleAnswerSubmit(userInput, example) {
+  _submit(userInput, example, wasMultipleChoice) {
     if (!userInput.trim()) return;
-    // Zaznamenat fázi PŘED zpracováním odpovědi (checkAnswer zvýší modeAnswered)
-    const wasMultipleChoice = this.quiz.isMultipleChoicePhase();
     const result = this.onAnswer(userInput);
-    if (result) {
-      this.renderResult(result, example, wasMultipleChoice);
-    }
+    if (result) this.renderResult(result, example, wasMultipleChoice);
   }
 
   // ─── Výsledek ─────────────────────────────────────────────────────────────
 
   renderResult(result, example, wasMultipleChoice) {
     const { isCorrect, correctAnswer } = result;
+    const choices = this._currentChoices;
 
-    // Označit vstup / tlačítka
     if (wasMultipleChoice) {
-      // Multiple choice: označit správné a špatné
-      const choicesList = this.els.questionCard.querySelector('#choicesList');
-      const choices = this._currentChoices || [];
-      if (choicesList) {
-        choicesList.querySelectorAll('.choice-btn').forEach(btn => {
+      const list = this.els.questionCard.querySelector('#choicesList');
+      if (list) {
+        list.querySelectorAll('.choice-btn').forEach(btn => {
           btn.disabled = true;
-          const idx = parseInt(btn.dataset.index, 10);
-          const btnValue = choices[idx];
-          if (btnValue === correctAnswer) {
-            btn.classList.add('correct');
-          } else if (btnValue === result.userInput && !isCorrect) {
-            btn.classList.add('wrong');
-          }
+          const val = choices[parseInt(btn.dataset.index, 10)];
+          if (val === correctAnswer) btn.classList.add('correct');
+          else if (val === result.userInput && !isCorrect) btn.classList.add('wrong');
         });
       }
     } else {
       const input = this.els.questionCard.querySelector('#answerInput');
       const submitBtn = this.els.questionCard.querySelector('#submitBtn');
-      if (input) {
-        input.classList.add(isCorrect ? 'correct' : 'wrong');
-        input.disabled = true;
-      }
+      if (input) { input.classList.add(isCorrect ? 'correct' : 'wrong'); input.disabled = true; }
       if (submitBtn) submitBtn.disabled = true;
     }
 
-    // Zobrazit výsledek
     const resultSection = this.els.questionCard.querySelector('#resultSection');
     if (!resultSection) return;
 
@@ -327,7 +405,7 @@ export class UI {
     if (isCorrect) {
       resultSection.innerHTML = `
         <div class="result-section correct">
-          <div class="result-title">✓ ${escapeHtml(randomPositive())}</div>
+          <div class="result-title">✓ ${escapeHtml(randomFrom(POSITIVE_MESSAGES))}</div>
         </div>
       `;
     } else {
@@ -344,14 +422,16 @@ export class UI {
       `;
     }
 
-    // Ukázat tlačítko Další
     this.els.nextBtn.style.display = '';
     this.renderStats();
 
-    // Scrollovat k výsledku
-    setTimeout(() => {
-      resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 100);
+    // Oslava streaku
+    const streak = this.quiz.streak;
+    if (isCorrect && (streak === 5 || streak === 10 || (streak > 10 && streak % 10 === 0))) {
+      setTimeout(() => this.showCelebration(streak), 400);
+    }
+
+    setTimeout(() => resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
   }
 
   // ─── Prázdný stav ─────────────────────────────────────────────────────────

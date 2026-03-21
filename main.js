@@ -1,5 +1,3 @@
-// Vstupní bod aplikace — inicializace a propojení Quiz + UI
-
 import { Quiz } from './quiz.js';
 import { UI } from './ui.js';
 
@@ -14,32 +12,28 @@ const ui = new UI(
   handleReset,
 );
 
-// ─── Handlery ─────────────────────────────────────────────────────────────
-
 function handleAnswer(userInput) {
   return quiz.checkAnswer(userInput);
 }
 
 function handleNext() {
-  const example = quiz.nextExample();
-  if (!example) {
+  const result = quiz.nextExample();
+  if (!result) {
     ui.renderEmpty();
     return;
   }
-  ui.renderQuestion(example);
+  ui.renderQuestion(result.example, result.isRetry);
 }
 
 function handleModeChange(mode) {
   quiz.setMode(mode);
   ui.render();
-  // Automaticky načíst novou otázku
   handleNext();
 }
 
 function handleGroupToggle(group) {
   quiz.toggleGroup(group);
   ui.render();
-  // Pokud je aktuální příklad v odfiltrované skupině, načíst nový
   handleNext();
 }
 
@@ -48,8 +42,6 @@ function handleReset() {
   ui.render();
   handleNext();
 }
-
-// ─── Start ─────────────────────────────────────────────────────────────────
 
 ui.render();
 handleNext();
