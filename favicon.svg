@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Background -->
+  <rect width="32" height="32" rx="7" fill="#2563eb"/>
+
+  <!-- Benzene ring: outer hexagon (flat-top orientation) -->
+  <!-- radius 11.5, center (16,16), flat top → first vertex at 0° = right -->
+  <!-- vertices: 0°=right, 60°=bottom-right, 120°=bottom-left, 180°=left, 240°=top-left, 300°=top-right -->
+  <polygon
+    points="27.5,16 21.75,25.96 10.25,25.96 4.5,16 10.25,6.04 21.75,6.04"
+    fill="none"
+    stroke="white"
+    stroke-width="2"
+    stroke-linejoin="round"
+  />
+
+  <!-- Inner circle (aromatic delocalization) -->
+  <circle cx="16" cy="16" r="5.5" fill="none" stroke="white" stroke-width="1.6"/>
+</svg>
