@@ -166,7 +166,6 @@ export class Quiz {
       this.correctSinceRetry++;
     } else {
       this.streak = 0;
-      this.correctSinceRetry = 0;
       // Přidat do retry fronty (ne duplikát)
       const alreadyQueued = this.retryQueue.some(r => r.example.id === example.id);
       if (!alreadyQueued) {
