@@ -1,5 +1,3 @@
-import { GROUPS } from './data.js';
-
 const POSITIVE_MESSAGES = [
   'Správně!',
   'Výborně!',
@@ -44,13 +42,16 @@ function formatFormula(formula) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class UI {
-  constructor(quiz, onAnswer, onNext, onModeChange, onGroupToggle, onReset) {
+  constructor(quiz, onAnswer, onNext, onModeChange, onGroupToggle, onReset, modules, onModuleChange) {
     this.quiz = quiz;
     this.onAnswer = onAnswer;
     this.onNext = onNext;
     this.onModeChange = onModeChange;
     this.onGroupToggle = onGroupToggle;
     this.onReset = onReset;
+    this.modules = modules;           // [{ id, label }]
+    this.onModuleChange = onModuleChange;
+    this.activeModuleId = modules[0].id;
     this._currentChoices = [];
 
     this._buildShell();
@@ -65,7 +66,8 @@ export class UI {
     wrapper.className = 'app-wrapper';
     wrapper.innerHTML = `
       <header class="app-header">
-        <div class="app-title">Soli <span>— chemické názvosloví</span></div>
+        <div class="app-title">Chemické názvosloví</div>
+        <div class="module-switcher" id="moduleSwitcher"></div>
         <div class="header-right">
           <button class="errors-btn" id="errorsBtn" title="Zobrazit záznamy chyb">Chyby <span class="errors-count" id="errorsCount">0</span></button>
           <div class="stats-bar" id="statsBar"></div>
@@ -78,7 +80,6 @@ export class UI {
       </div>
 
       <section class="groups-section">
-        <div class="groups-label">Procvičované skupiny</div>
         <div class="groups-list" id="groupsList"></div>
       </section>
 
@@ -107,6 +108,7 @@ export class UI {
     document.body.appendChild(wrapper);
 
     this.els = {
+      moduleSwitcher: wrapper.querySelector('#moduleSwitcher'),
       statsBar: wrapper.querySelector('#statsBar'),
       groupsList: wrapper.querySelector('#groupsList'),
       questionCard: wrapper.querySelector('#questionCard'),
@@ -220,21 +222,33 @@ export class UI {
     }
   }
 
+  // ─── Přepínač modulů ──────────────────────────────────────────────────────
+
+  renderModuleSwitcher() {
+    this.els.moduleSwitcher.innerHTML = '';
+    this.modules.forEach(mod => {
+      const btn = document.createElement('button');
+      btn.className = 'module-btn' + (mod.id === this.activeModuleId ? ' active' : '');
+      btn.textContent = mod.label;
+      btn.addEventListener('click', () => {
+        if (mod.id === this.activeModuleId) return;
+        this.activeModuleId = mod.id;
+        this.onModuleChange(mod.id);
+      });
+      this.els.moduleSwitcher.appendChild(btn);
+    });
+  }
+
   // ─── Skupiny ──────────────────────────────────────────────────────────────
 
   renderGroups() {
-    const labels = {
-      [GROUPS.BEZKYSLICATE]: 'Bezkyslíkaté',
-      [GROUPS.KYSLICATE]: 'Kyslíkaté',
-      [GROUPS.HYDRATY]: 'Hydráty',
-      [GROUPS.PODVOJNE]: 'Podvojné',
-      [GROUPS.ZASADITE]: 'Zásadité',
-    };
+    const groups = this.quiz._groups;
     this.els.groupsList.innerHTML = '';
-    Object.values(GROUPS).forEach(group => {
+    Object.values(groups).forEach(group => {
       const chip = document.createElement('button');
       chip.className = 'group-chip' + (this.quiz.isGroupActive(group) ? ' active' : '');
-      chip.innerHTML = `<span class="dot"></span>${escapeHtml(labels[group])}`;
+      chip.dataset.group = group;
+      chip.innerHTML = `<span class="dot"></span>${escapeHtml(group)}`;
       chip.addEventListener('click', () => this.onGroupToggle(group));
       this.els.groupsList.appendChild(chip);
     });
@@ -275,13 +289,17 @@ export class UI {
 
     const promptLabel = isModeA ? 'Vzorec' : 'Název';
     const promptValue = isModeA ? example.formula : example.name;
-    const answerLabel = isModeA ? 'Napiš název soli:' : 'Napiš vzorec soli:';
+    const noun = (this.modules.find(m => m.id === this.activeModuleId) ?? {}).noun ?? 'látky';
+    const answerLabel = isModeA ? `Napiš název ${noun}:` : `Napiš vzorec ${noun}:`;
 
     const retryBadge = isRetry
       ? `<span class="retry-badge">🔁 Opakování</span>`
       : '';
     const phaseBadge = isMultipleChoice
       ? `<span class="phase-badge">výběr z možností</span>`
+      : '';
+    const badgesHtml = retryBadge || phaseBadge
+      ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${retryBadge}${phaseBadge}</div>`
       : '';
 
     let answerHtml;
@@ -312,15 +330,11 @@ export class UI {
       : `<span class="question-value">${escapeHtml(promptValue)}</span>`;
 
     const progress = Math.min(this.quiz.sessionAnswered / 30, 1) * 100;
-    const stars = '★'.repeat(example.difficulty) + '☆'.repeat(3 - example.difficulty);
 
     this.els.questionCard.innerHTML = `
       <div class="question-meta">
         <span class="question-group-badge">${escapeHtml(example.group)}</span>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          ${retryBadge}${phaseBadge}
-          <span class="question-mode-label">${stars}</span>
-        </div>
+        ${badgesHtml}
       </div>
       <div class="progress-wrap">
         <div class="progress-fill" style="width:${progress}%"></div>
@@ -337,6 +351,25 @@ export class UI {
 
     this._attachAnswerListeners(example, isMultipleChoice);
     this.els.nextBtn.style.display = 'none';
+    this._highlightCurrentGroup(example.group, example.difficulty);
+  }
+
+  _highlightCurrentGroup(group, difficulty) {
+    const chips = this.els.groupsList.querySelectorAll('.group-chip');
+    chips.forEach(chip => {
+      chip.classList.remove('current-question');
+      const stars = chip.querySelector('.chip-stars');
+      if (stars) stars.remove();
+    });
+    chips.forEach(chip => {
+      if (chip.dataset.group === group) {
+        chip.classList.add('current-question');
+        const starsEl = document.createElement('span');
+        starsEl.className = 'chip-stars';
+        starsEl.textContent = '★'.repeat(difficulty) + '☆'.repeat(3 - difficulty);
+        chip.appendChild(starsEl);
+      }
+    });
   }
 
   _attachAnswerListeners(example, isMultipleChoice) {
@@ -440,7 +473,7 @@ export class UI {
     this.els.questionCard.innerHTML = `
       <div class="empty-state">
         <h2>Žádné příklady</h2>
-        <p>Vyber alespoň jednu skupinu solí výše.</p>
+        <p>Vyber alespoň jednu skupinu výše.</p>
       </div>
     `;
     this.els.nextBtn.style.display = 'none';
@@ -449,6 +482,7 @@ export class UI {
   // ─── Plná aktualizace ─────────────────────────────────────────────────────
 
   render() {
+    this.renderModuleSwitcher();
     this.renderModeSwitch();
     this.renderGroups();
     this.renderStats();

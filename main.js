@@ -1,7 +1,14 @@
 import { Quiz } from './quiz.js';
 import { UI } from './ui.js';
+import * as dataSoli from './data.js';
+import * as dataOxidy from './data-oxidy.js';
 
-const quiz = new Quiz();
+const MODULES = [
+  { id: 'soli',  label: 'Soli',  noun: 'soli',  data: dataSoli },
+  { id: 'oxidy', label: 'Oxidy', noun: 'oxidu', data: dataOxidy },
+];
+
+let quiz = new Quiz(MODULES[0].data);
 
 const ui = new UI(
   quiz,
@@ -10,6 +17,8 @@ const ui = new UI(
   handleModeChange,
   handleGroupToggle,
   handleReset,
+  MODULES,
+  handleModuleChange,
 );
 
 function handleAnswer(userInput) {
@@ -39,6 +48,14 @@ function handleGroupToggle(group) {
 
 function handleReset() {
   quiz.resetSession();
+  ui.render();
+  handleNext();
+}
+
+function handleModuleChange(moduleId) {
+  const mod = MODULES.find(m => m.id === moduleId);
+  quiz = new Quiz(mod.data);
+  ui.quiz = quiz;
   ui.render();
   handleNext();
 }

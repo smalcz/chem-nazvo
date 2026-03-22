@@ -46,7 +46,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 /* ─── Hlavička ───────────────────────────────────────────────────────────── */
@@ -104,6 +104,38 @@ body {
   color: var(--primary);
 }
 
+/* ─── Přepínač modulů ───────────────────────────────────────────────────── */
+.module-switcher {
+  display: flex;
+  gap: 8px;
+  padding: 0;
+}
+
+.module-btn {
+  padding: 6px 14px;
+  border: 2px solid var(--neutral-mid, #d1d5db);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--card);
+  transition: all var(--transition);
+  letter-spacing: 0.02em;
+}
+
+.module-btn.active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-light, #eff6ff);
+  box-shadow: var(--shadow);
+}
+
+.module-btn:hover:not(.active) {
+  border-color: var(--primary);
+  color: var(--text);
+}
+
 /* ─── Přepínač režimu ────────────────────────────────────────────────────── */
 .mode-switcher {
   display: flex;
@@ -142,7 +174,7 @@ body {
 .groups-section {
   background: var(--card);
   border-radius: var(--radius);
-  padding: 14px 16px;
+  padding: 8px 12px;
   box-shadow: var(--shadow);
 }
 
@@ -165,7 +197,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  padding: 4px 10px;
   border-radius: 999px;
   border: 2px solid var(--border);
   font-size: 0.8rem;
@@ -181,6 +213,20 @@ body {
   border-color: var(--primary);
   background: var(--primary-light);
   color: var(--primary);
+}
+
+.group-chip.current-question {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.chip-stars {
+  font-size: 0.6rem;
+  opacity: 0.75;
+  margin-left: 1px;
+  letter-spacing: -1px;
 }
 
 .group-chip:hover {
@@ -813,7 +859,7 @@ body {
 @media (max-width: 480px) {
   .app-wrapper {
     padding: 12px;
-    gap: 12px;
+    gap: 8px;
   }
 
   .question-card {

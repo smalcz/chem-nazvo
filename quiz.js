@@ -1,9 +1,3 @@
-import {
-  examples,
-  GROUPS,
-  MULTIPLE_CHOICE_COUNT_MODE_A,
-  MULTIPLE_CHOICE_COUNT_MODE_B,
-} from './data.js';
 
 // ─── Normalizace ─────────────────────────────────────────────────────────────
 
@@ -26,7 +20,7 @@ function textsMatch(input, target) {
 function normalizeFormula(formula) {
   return formula
     .trim()
-    .replace(/\s*[·•]\s*/g, '·')
+    .replace(/\s*[·•.]\s*/g, '·')
     .replace(/₀/g,'0').replace(/₁/g,'1').replace(/₂/g,'2').replace(/₃/g,'3')
     .replace(/₄/g,'4').replace(/₅/g,'5').replace(/₆/g,'6').replace(/₇/g,'7')
     .replace(/₈/g,'8').replace(/₉/g,'9')
@@ -40,9 +34,14 @@ function formulasMatch(input, target) {
 // ─── Quiz ────────────────────────────────────────────────────────────────────
 
 export class Quiz {
-  constructor() {
+  constructor(data) {
+    this._examples = data.examples;
+    this._groups = data.GROUPS;
+    this._mcA = data.MULTIPLE_CHOICE_COUNT_MODE_A;
+    this._mcB = data.MULTIPLE_CHOICE_COUNT_MODE_B;
+
     this.mode = 'A';
-    this.activeGroups = new Set(Object.values(GROUPS));
+    this.activeGroups = new Set(Object.values(this._groups));
 
     // Statistiky
     this.sessionAnswered = 0;
@@ -68,7 +67,7 @@ export class Quiz {
   // ─── Výběr příkladu ───────────────────────────────────────────────────────
 
   getFilteredExamples() {
-    return examples.filter(e => this.activeGroups.has(e.group));
+    return this._examples.filter(e => this.activeGroups.has(e.group));
   }
 
   nextExample() {
@@ -107,7 +106,7 @@ export class Quiz {
   // ─── Multiple choice ──────────────────────────────────────────────────────
 
   isMultipleChoicePhase() {
-    const limit = this.mode === 'A' ? MULTIPLE_CHOICE_COUNT_MODE_A : MULTIPLE_CHOICE_COUNT_MODE_B;
+    const limit = this.mode === 'A' ? this._mcA : this._mcB;
     return this.modeAnswered < limit;
   }
 
