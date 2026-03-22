@@ -1,3 +1,5 @@
+import { VERSION, BUILD_TIME } from './version.js';
+
 const POSITIVE_MESSAGES = [
   'Správně!',
   'Výborně!',
@@ -66,7 +68,7 @@ export class UI {
     wrapper.className = 'app-wrapper';
     wrapper.innerHTML = `
       <header class="app-header">
-        <div class="app-title">Chemické názvosloví</div>
+        <div class="app-title" data-version="${VERSION}" data-buildtime="${BUILD_TIME}">Chemické názvosloví</div>
         <div class="module-switcher" id="moduleSwitcher"></div>
         <div class="header-right">
           <button class="errors-btn" id="errorsBtn" title="Zobrazit záznamy chyb">Chyby <span class="errors-count" id="errorsCount">0</span></button>

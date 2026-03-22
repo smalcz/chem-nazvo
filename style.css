@@ -63,6 +63,31 @@ body {
   font-weight: 700;
   color: var(--primary);
   letter-spacing: -0.02em;
+  position: relative;
+  cursor: default;
+}
+
+.app-title::after {
+  content: attr(data-version) ' · ' attr(data-buildtime);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: var(--text);
+  color: var(--card);
+  font-size: 0.65rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  padding: 3px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 10;
+}
+
+.app-title:hover::after {
+  opacity: 1;
 }
 
 .app-title span {
