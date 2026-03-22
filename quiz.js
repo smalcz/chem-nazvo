@@ -83,7 +83,8 @@ export class Quiz {
       return { example: item.example, isRetry: true };
     }
 
-    const pool = this.getFilteredExamples();
+    const retryIds = new Set(this.retryQueue.map(r => r.example.id));
+    const pool = this.getFilteredExamples().filter(e => !retryIds.has(e.id));
     if (pool.length === 0) return null;
 
     const unusedPool = pool.filter(e => !this.usedIds.has(e.id));
