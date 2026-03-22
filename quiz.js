@@ -42,6 +42,9 @@ export class Quiz {
 
     this.mode = 'A';
     this.activeGroups = new Set(Object.values(this._groups));
+    if (data.DEFAULT_INACTIVE_GROUPS) {
+      data.DEFAULT_INACTIVE_GROUPS.forEach(g => this.activeGroups.delete(g));
+    }
 
     // Statistiky
     this.sessionAnswered = 0;
@@ -141,7 +144,10 @@ export class Quiz {
     let isCorrect = false;
     if (this.mode === 'A') {
       const accepted = [example.name, ...(example.acceptedNames || [])];
-      isCorrect = accepted.some(a => textsMatch(userInput, a));
+      const short = accepted
+        .filter(a => /^kyselina\s+/i.test(a))
+        .map(a => a.replace(/^kyselina\s+/i, ''));
+      isCorrect = [...accepted, ...short].some(a => textsMatch(userInput, a));
     } else {
       const accepted = [example.formula, ...(example.acceptedFormulas || [])];
       isCorrect = accepted.some(a => formulasMatch(userInput, a));
